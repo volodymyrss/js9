@@ -64,7 +64,9 @@ const globalOpts = {
 		       pingInterval:      20000,
 		       pingTimeout:       30000,
 		       cors:{origin:      true},
-		       allowEIO3:         true},
+		       allowEIO3:         true,
+			//    path: "/js9Helper" // works locally if url is not stripped of prefix. else not needed
+			},
     cmd:              "js9helper",
     analysisPlugins:  "analysis-plugins",
     analysisWrappers: "analysis-wrappers",
@@ -974,6 +976,7 @@ const sendMsg = function(socket, obj, cbfunc) {
 
 // socketio handler: field socket.io requests
 const socketioHandler = function(socket) {
+	clog(`in socketioHandler ${socket}`)
     let i, j, m, a;
     // func outside loop needed to make jslint happy
     const xfunc = (obj, cbfunc) => {
@@ -1010,6 +1013,8 @@ const socketioHandler = function(socket) {
     // for other implementations, this is needed if you want to:
     //   support sending external messages to JS9 (i.e., via js9 script)
     socket.on("initialize", (obj, cbfunc) => {
+		clog(`in socketioHandler initialize ${socket}`)
+
 	let basedir, aworkdir, jpath;
 	const myhost = getHost(socket);
 	if( !obj ){return;}
@@ -1281,135 +1286,171 @@ const socketioHandler = function(socket) {
 // wget -q -O- --post-data='{"id": "'$ID'", "cmd": "SetColormap", "args": ["red"]}' $MYHOST/msg
 // wget -q -O- --post-data='{"id": "'$ID'", "cmd": "RunAnalysis", "args": ["counts"]}' $MYHOST/msg
 const httpHandler = function(req, res){
+	clog(`got URL: ${req.url}`)    
+	// clog(`got req.headers: ${req.headers}`)    
+	// console.log(req)
+
     let cmd, gobj, s, jstr;
     let body = "";
+
     // return error into to browser
     const htmlerr = (s) => {
-	// remove non-ascii characters, which throw an error here
-	// eslint-disable-next-line no-control-regex
-	let msg = String(s).replace(/[^\x00-\x7F]/g, "");
-	res.writeHead(400, msg, {"Content-Type": "text/plain"});
-	res.end();
+		// remove non-ascii characters, which throw an error here
+		// eslint-disable-next-line no-control-regex
+		let msg = String(s).replace(/[^\x00-\x7F]/g, "");
+		res.writeHead(400, msg, {"Content-Type": "text/plain"});
+		res.end();
     };
+
     // call-back func returning info to the client
     const cbfunc = (s) => {
-	let t;
-	if( s === undefined || s === null ){ s = ""; }
-	switch(typeof s){
-	case "string":
-	    t = s;
-	    break;
-	case "object":
-	    try{ t = JSON.stringify(s); }
-	    catch(e){ t = ""; }
-	    break;
-	default:
-	    t = String(s);
-	    break;
-	}
-	// add newline to non-null return string, if necessary
-	if( t.length >= 1 && t.charAt(t.length-1) !== "\n" ){
-	    t += "\n";
-	}
-	res.writeHead(200, {"Content-Type": "text/plain"});
-	res.write(t);
-	res.end();
+		let t;
+		if( s === undefined || s === null ){ s = ""; }
+		switch(typeof s){
+		case "string":
+			t = s;
+			break;
+		case "object":
+			try{ t = JSON.stringify(s); }
+			catch(e){ t = ""; }
+			break;
+		default:
+			t = String(s);
+			break;
+		}
+		// add newline to non-null return string, if necessary
+		if( t.length >= 1 && t.charAt(t.length-1) !== "\n" ){
+			t += "\n";
+		}
+		res.writeHead(200, {"Content-Type": "text/plain"});
+		res.write(t);
+		res.end();
     };
+
     // generate object and run the cmd
     const docmd = (cmd, jstr) => {
-	let i, j, s;
-	let obj = {};
-	// the constructed string is stringified json, if it exists
-	// try to parse it into an object
-	if( cmd !== "alive" && jstr && jstr !== "null" ){
-	    try{ obj = JSON.parse(jstr); }
-	    catch(e){
-		htmlerr("can't parse JSON object in http request");
-		return;
-	    }
-	    if( typeof obj !== "object" ){
-		htmlerr("invalid JSON object in http request");
-		return;
-	    }
-	}
-	// check for id and set default
-	obj.id = obj.id || "JS9";
-	// process the command
-	switch(cmd){
-	case "alive":
-	    // if this is a jsonp request, wrap the return string
-	    // (this is done by the desktop app)
-	    if( jstr.match(/^callback=/) ){
-		s = `${jstr.replace(/^callback=/, "")}("OK")`;
-	    } else {
-		// ordinary request with ordinary return
-		s = "OK";
-	    }
-	    // return callback
-	    cbfunc(s);
-	    break;
-	case "msg":
-	    // send a command from an external source to a JS9 browser
-	    sendMsg(req, obj, cbfunc);
-	    break;
-	default:
-	    // plugin messages: NB needs authentication!
-	    for(j=0; j<plugins.length; j++){
-		// simple plugin: name is the same as the plugin filename
-		if( plugins[j].http && (cmd === plugins[j].name) ){
-		    plugins[j].http(req, obj, cbfunc);
-		    return;
+		clog(`docmd: cmd "${cmd}" jstr "${jstr}"`)    
+		let i, j, s;
+		let obj = {};
+
+
+		if ( cmd == "socket.io/socket.io.js" ) {
+				// fs = require('fs')
+				fs.readFile('./node_modules/socket.io/client-dist/socket.io.js', 'utf8', function (err, data) {
+					if (err) {
+						return console.log(err);
+					}
+					cbfunc(data);
+			});
+			return;
 		}
-		if( plugins[j].httpList ){
-		    // list of plugins, each with their own name
-		    for(i=0; i<plugins[j].httpList.length; i++){
-			if( cmd === plugins[j].httpList[i].name ){
-			    plugins[j].httpList[i].func(req, obj, cbfunc);
-			    return;
+
+
+
+		// the constructed string is stringified json, if it exists
+		// try to parse it into an object
+		if( cmd !== "alive" && jstr && jstr !== "null" ){
+			try{ obj = JSON.parse(jstr); }
+			catch(e){
+				htmlerr("js9Helper can't parse JSON object in http request");
+				return;
 			}
-		    }
+			if( typeof obj !== "object" ){
+				htmlerr("invalid JSON object in http request");
+				return;
+			}
 		}
-	    }
-	    htmlerr(`unknown command in ${req.method} request: ${cmd}`);
-	    break;
-	}
+		// check for id and set default
+		obj.id = obj.id || "JS9";
+		// process the command
+		switch(cmd){
+		case "alive":
+			// if this is a jsonp request, wrap the return string
+			// (this is done by the desktop app)
+			if( jstr.match(/^callback=/) ){
+			s = `${jstr.replace(/^callback=/, "")}("OK")`;
+			} else {
+			// ordinary request with ordinary return
+			s = "OK";
+			}
+			// return callback
+			cbfunc(s);
+			break;
+		case "msg":
+			// send a command from an external source to a JS9 browser
+			sendMsg(req, obj, cbfunc);
+			break;
+		default:
+			// plugin messages: NB needs authentication!
+			for(j=0; j<plugins.length; j++){
+			// simple plugin: name is the same as the plugin filename
+			if( plugins[j].http && (cmd === plugins[j].name) ){
+				plugins[j].http(req, obj, cbfunc);
+				return;
+			}
+			if( plugins[j].httpList ){
+				// list of plugins, each with their own name
+				for(i=0; i<plugins[j].httpList.length; i++){
+				if( cmd === plugins[j].httpList[i].name ){
+					plugins[j].httpList[i].func(req, obj, cbfunc);
+					return;
+				}
+				}
+			}
+			}
+
+			htmlerr(`js9Helper reports: unknown command in ${req.method} request: "${cmd}"`);
+			break;
+		}
     };
     // parse url to get object for easier handling
-    gobj = url.parse(req.url);
+	gobj = url.parse(req.url);
     // get command from pathname
     if( gobj.pathname ){
-	cmd = gobj.pathname.replace(/^\//, "");
-    }
+		cmd = gobj.pathname.replace(/^\/+/, "");
+		clog(`cmd "${cmd}" from gobj.pathname: ${gobj.pathname}`);
+    } else {
+		clog(`cmd "${cmd}" NOT from gobj.pathname`);
+	}
+
+	if( cmd.includes('js9Helper')) {
+		clog(`detected prefixed js9Helper: ${cmd}`);
+		cmd = cmd.split('js9Helper')[1].replace(/^\//, "");
+		clog(`extracted command: ${cmd}`);
+	} else {
+		clog(`detected UNprefixed js9Helper, cmd: "${cmd}"`);
+	}
+
     // method-specific processing
     switch(req.method){
     case "GET":
-	// fix some awkwardness in qs.parse
-	if( gobj.query ){
-	    gobj.query = gobj.query.replace(/\+/g, "%2B");
+		// fix some awkwardness in qs.parse
+		if( gobj.query ){
+			gobj.query = gobj.query.replace(/\+/g, "%2B");
+		}
+		// we pass the stringified json data directly command type,
+		// so prepend an obj so we can parse it
+		s = `obj=${gobj.query}`;
+		try{ jstr = qs.parse(s).obj; }
+		catch(e){
+			htmlerr("can't parse JSON object in http GET request");
+			return;
+		}
+		docmd(cmd, jstr);
+		break;
+	case "POST":
+		req.on('data', (chunk) => {
+			body += chunk;
+		});
+		req.on('end', () => {
+			jstr = String(body);
+			docmd(cmd, jstr);
+		});
+		break;
+	default:
+		htmlerr(`unsupported method: ${req.method}`);
+		return;
 	}
-	// we pass the stringified json data directly command type,
-	// so prepend an obj so we can parse it
-	s = `obj=${gobj.query}`;
-	try{ jstr = qs.parse(s).obj; }
-	catch(e){
-	    htmlerr("can't parse JSON object in http GET request");
-	    return;
-	}
-	docmd(cmd, jstr);
-	break;
-    case "POST":
-	req.on('data', (chunk) => {
-	    body += chunk;
-	});
-	req.on('end', () => {
-	    jstr = String(body);
-	    docmd(cmd, jstr);
-	});
-	break;
-    default:
-	htmlerr(`unsupported method: ${req.method}`);
-	return;
-    }
 };
 
 // polyfill for ES2017 Array.prototype.includes from:
@@ -1524,7 +1565,7 @@ io.on("connection", socketioHandler);
 app.listen(globalOpts.helperPort, globalOpts.helperHost);
 
 // signal that we are listening for connections
-clog("helper: %s %s", globalOpts.helperHost, globalOpts.helperPort);
+clog("starting helper: %s %s", globalOpts.helperHost, globalOpts.helperPort);
 
 // an example of adding an in-line messsage to the analysis task list
 if( process.env.NODEJS_FOO === "analysis" ){

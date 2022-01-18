@@ -11487,20 +11487,35 @@ JS9.Helper.prototype.connect = function(type){
 	    JS9.log(`JS9 helper connect error: ${textStatus} (${errorThrown})`);
 	}
     };
+
     const connectHelper = (url) => {
-	// connect to helper
-	$.ajax({
-	    url: url,
+
+		let parsed_url;
+		parsed_url = new URL(url);
+		JS9.log('parsed url');
+		JS9.log(parsed_url);
+
+		// connect to helper
+	JS9.log(`JS9 JS9.Helper.prototype.connect will ajax url: ${url}`);				
+	$.ajax({		
+	    // url: url,
+		// url: "http://localhost:8888/js9html/socket.io.js", // TODO: script source
+		url: parsed_url.pathname.replace('js9Helper/socket.io.js', 'js9html/socket.io.js'),
 	    dataType: "script",
 	    timeout: JS9.globalOpts.htimeout,
 	    cache: true,
 	    success: () => {
+
+		JS9.log(`JS9 connectHelper sockurl url: ${url}`);			
 		const sockopts = {
 		    reconnection: true,
 		    reconnectionDelay: 1000,
 		    reconnectionDelayMax : 10000,
 		    reconnectionAttempts: 100,
-		    timeout: JS9.globalOpts.htimeout
+		    timeout: JS9.globalOpts.htimeout,
+			// path: "/js9Helper/socket.io",
+			path: parsed_url.pathname.replace('socket.io.js', 'socket.io')
+			// transports: ['polling'], 
 		};
 		// if there is no io object, we didn't really succeed
 		// can happen, for example, in the Jupyter environment
@@ -11509,9 +11524,27 @@ JS9.Helper.prototype.connect = function(type){
 		    return;
 		}
 		// connect to the helper
-		this.socket = io.connect(this.url, sockopts);
+		// VS:
+		// url = "http://127.0.0.1:8888"
+		// url = "http://localhost:8000";
+
+		JS9.log(`JS9 helper: auto-url: ${url}`);
+		// url = "http://localhost:8888";
+		url = parsed_url.host;
+		JS9.log(`JS9 helper: adapted-url: ${url}`);
+		
+
+		JS9.log(`JS9 helper: connecting socket: ${url} ${sockopts}`);
+		this.socket = io(url, sockopts);
+		// this.socket.io.opts.path = "js9Helper"
+		// this.socket = io.connect("ws://127.0.0.1:8888/js9Helper");
+		// this.socket = io.connect(url, sockopts);
+		JS9.log(`created socket ${this.socket}`)
+		JS9.log(this.socket);
+		
 		// on-event processing
 		this.socket.on("connect", () => {
+			JS9.log(`JS9 helper: on-connect: ${this.type}`);
 		    let ii, d, p;
 		    this.connected = true;
 		    this.helper = true;
@@ -11535,11 +11568,13 @@ JS9.Helper.prototype.connect = function(type){
 		    $(document).trigger("JS9:connected",
 					{type: "socket.io", status: "OK"});
 		});
-		this.socket.on("connect_error", () => {
+		this.socket.on("connect_error", (err) => {
 		    this.connected = false;
 		    this.helper = false;
 		    if( JS9.DEBUG > 1 ){
-			JS9.log("JS9 helper: connect error");
+				JS9.log(`JS9 helper: connect error in connectHelper: ${this.url} ${err.message}`);
+				JS9.log(err.Request)
+				JS9.log(err)
 		    }
 		});
 		this.socket.on("connect_timeout", () => {
@@ -11576,7 +11611,8 @@ JS9.Helper.prototype.connect = function(type){
 		this.socket.on("msg", JS9.msgHandler);
 	    },
 	    error: (jqXHR, textStatus, errorThrown) => {
-		failedHelper(textStatus, errorThrown);
+			JS9.log("JS9 helper source fetch failed: reconnect");
+			failedHelper(textStatus, errorThrown);
 	    }
 	});
     };
@@ -11611,20 +11647,25 @@ JS9.Helper.prototype.connect = function(type){
     }
     // base of helper url is either specified, same as current domain, or local
     if( JS9.globalOpts.helperURL ){
-	if( JS9.globalOpts.helperURL.search(/:\/\//) >=0 ){
-	    this.url = JS9.globalOpts.helperURL;
-	} else {
-	    this.url = JS9.globalOpts.helperProtocol + JS9.globalOpts.helperURL;
-	}
+		if( JS9.globalOpts.helperURL.search(/:\/\//) >=0 ){
+			this.url = JS9.globalOpts.helperURL;
+			JS9.log(`JS9 helper url from JS9.globalOpts.helperURL: connect: ${this.url}`);
+		} else {
+			this.url = JS9.globalOpts.helperProtocol + JS9.globalOpts.helperURL;
+			JS9.log(`JS9 helper url from JS9.globalOpts.helperURL + helperProtocol: connect: ${this.url}`);
+		}
     } else if( document.domain ){
-	if( location.origin ){
-	    this.url = location.origin;
-	} else {
-	    this.url = JS9.globalOpts.helperProtocol + document.domain;
-	}
+		if( location.origin ){
+			this.url = location.origin;
+			JS9.log(`JS9 helper url from location.origin: connect: ${this.url}`);
+		} else {
+			this.url = JS9.globalOpts.helperProtocol + document.domain;
+			JS9.log(`JS9 helper url from document.domain: connect: ${this.url}`);
+		}
     } else {
-	this.url = `${JS9.globalOpts.helperProtocol}localhost`;
+		this.url = `${JS9.globalOpts.helperProtocol}localhost`;
     }
+
     // save base of url
     this.baseurl = this.url;
     // try to establish connection, based on connection type
@@ -11637,43 +11678,54 @@ JS9.Helper.prototype.connect = function(type){
         break;
     case "get":
     case "post":
-	// sanity check
-	if( !JS9.globalOpts.helperCGI ){
-	    JS9.error("cgi script name missing for helper");
-	}
-	this.url += `/${JS9.globalOpts.helperCGI}`;
-	this.connected = true;
-	this.helper = true;
-        if( JS9.DEBUG ){
-	    JS9.log(`JS9 helper: connect: ${this.type}`);
-        }
-	this.ready = true;
-        $(document).trigger("JS9:helperReady", {type: "get", status: "OK"});
-	break;
-    case "sock.io":
-    case "nodejs":
-	if( !JS9.globalOpts.helperPort ){
-	    JS9.error("port missing for helper");
-	}
-	// ignore port on url, add our own
-	this.url = `${this.url.replace(/:[0-9][0-9]*$/, "")}:${JS9.globalOpts.helperPort}`;
-	// which version of socket.io?
-	sockbase = "socket.io";
-	// use min version for production, as per migration docs
-	if( JS9.DEBUG <= 2 ){
-	    sockfile  = "socket.io.min.js";
-	} else {
-	    sockfile  = "socket.io.js";
-	}
-	// full url of the socket.io.js file
-	this.sockurl  = `${this.url}/${sockbase}/${sockfile}`;
-	// make sure helper is running and then connect
-	if( window.electron ){
-	    this.aliveurl = `${this.url}/alive`;
-	    waitForHelper(this.aliveurl, this.sockurl, tries);
-	} else {
-	    connectHelper(this.sockurl);
-	}
+		// sanity check
+		if( !JS9.globalOpts.helperCGI ){
+			JS9.error("cgi script name missing for helper");
+		}
+		this.url += `/${JS9.globalOpts.helperCGI}`;
+		this.connected = true;
+		this.helper = true;
+		if( JS9.DEBUG ){
+			JS9.log(`JS9 helper: connect: ${this.type} : ${this.url}`);
+		}
+		this.ready = true;
+		$(document).trigger("JS9:helperReady", {type: "get", status: "OK"});
+		break;
+	case "sock.io":
+	case "nodejs":
+		if( !JS9.globalOpts.helperPort ){
+			JS9.error("port missing for helper");
+		}
+		// ignore port on url, add our own
+		// this.url = `${this.url.replace(/:[0-9][0-9]*$/, "")}:${JS9.globalOpts.helperPort}`;
+
+		/// VS:
+		// local test!
+		// this.url = "http://localhost:3718"
+		// this.url = this.url + "/js9Helper";
+		JS9.log(`JS9 helper final url: ${this.url}`);
+		// which version of socket.io?
+		// VS: ok then, version
+		// sockbase = "socket.io";
+		sockbase = "js9Helper";
+		// use min version for production, as per migration docs
+		if( JS9.DEBUG <= 2 ){
+			sockfile  = "socket.io.min.js";
+		} else {
+			sockfile  = "socket.io.js";
+		}
+		// full url of the socket.io.js file
+		// this.sockurl  = `${sockfile}`;
+		this.sockurl  = `${this.url}/${sockbase}/${sockfile}`;
+		JS9.log(`JS9 helper sockurl url: ${this.sockurl}`);
+		// make sure helper is running and then connect
+		if( window.electron ){
+			this.aliveurl = `${this.url}/alive`;
+			JS9.log(`JS9 helper alive url: ${this.aliveurl}`);		
+			waitForHelper(this.aliveurl, this.sockurl, tries);
+		} else {
+			connectHelper(this.sockurl);
+		}
 	break;
     default:
 	JS9.error(`unknown helper type: ${this.type}`);
@@ -11704,42 +11756,43 @@ JS9.Helper.prototype.send = function(key, obj, cb){
     // tell server how to get to root (for datapath)
     // send message, based on connection type
     switch(this.type){
-    case "get":
-    case "post":
-	obj.key = key;
-	if( JS9.helper.pageid ){
-	    obj.pageid = JS9.helper.pageid;
+		case "get":
+		case "post":
+			obj.key = key;
+			if( JS9.helper.pageid ){
+				obj.pageid = JS9.helper.pageid;
+			}
+			if( JS9.DEBUG ){
+				JS9.log("JS9 cgi helper [%s, %s]: %s",
+					this.type, JSON.stringify(obj), this.url);
+			}
+
+			$.ajax({
+				url: this.url,
+				type: this.type.toUpperCase(),
+				data: obj,
+				dataType: "text",
+				success: (data) => {
+				if( typeof data === "string" &&
+					data.search(JS9.analOpts.epattern) >=0 ){
+					JS9.log(data);
+				}
+				if( cb ){
+					cb(data);
+				}
+				},
+				error: (jqXHR, textStatus, errorThrown) => {
+				if( JS9.DEBUG ){
+						JS9.log(`JS9 helper: ${this.type} failure: ${textStatus} ${errorThrown}`);
+				}
+				}
+			});
+			break;
+		case "sock.io":
+		case "nodejs":
+			JS9.helper.socket.emit(key, obj, cb);
+			break;
 	}
-        if( JS9.DEBUG ){
-	    JS9.log("JS9 cgi helper [%s, %s]: %s",
-		    this.type, JSON.stringify(obj), this.url);
-        }
-	$.ajax({
-	    url: this.url,
-	    type: this.type.toUpperCase(),
-	    data: obj,
-	    dataType: "text",
-	    success: (data) => {
-		if( typeof data === "string" &&
-		    data.search(JS9.analOpts.epattern) >=0 ){
-		    JS9.log(data);
-		}
-		if( cb ){
-		    cb(data);
-		}
-	    },
-	    error: (jqXHR, textStatus, errorThrown) => {
-		if( JS9.DEBUG ){
-	            JS9.log(`JS9 helper: ${this.type} failure: ${textStatus} ${errorThrown}`);
-		}
-	    }
-	});
-	break;
-    case "sock.io":
-    case "nodejs":
-	JS9.helper.socket.emit(key, obj, cb);
-	break;
-    }
     // allow chaining
     return this;
 };
@@ -21791,12 +21844,13 @@ JS9.loadScript = function(url, func, error){
 // (as of 2/2015: can't use $.ajax to retrieve a blob: use low-level xhr)
 JS9.fetchURL = function(name, url, opts, handler){
     let nurl;
+	JS9.log(`JS9.fetchURL: name: ${name} url: ${url} opts: ${opts} handler: ${handler}`);
     const xhr = new XMLHttpRequest();
     // opts is optional
     opts = opts || {};
     // sanity check
     if( !name && !url ){
-	JS9.error("invalid url specification for fetchURL");
+		JS9.error("invalid url specification for fetchURL");
     }
     // either url or name can be blank
     if( !url ){

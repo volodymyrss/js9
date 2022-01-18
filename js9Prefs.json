@@ -1,10 +1,10 @@
 {
-  "globalOpts": {"helperType":	     "nodejs",
+  "globalOpts": {
+	     "helperType":	     "socket.io",
   		 "helperPort":       2718, 
-		 "helperCGI":        "./cgi-bin/js9/js9Helper.cgi",
-		 "debug":	     0,
+		 "debug":	         0,
 		 "loadProxy":	     true,
-		 "workDir":	     "./tmp",
+		 "workDir":	         "./tmp",
 		 "workDirQuota":     100,
 		 "dataPath":	     "$HOME/Desktop:$HOME/data",
 		 "analysisPlugins":  "./analysis-plugins",

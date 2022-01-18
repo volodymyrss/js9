@@ -1,5 +1,5 @@
 #!/bin/bash
-#set -x
+set -x
 
 # js9msg: send a command to JS9 using wget or curl
 # node is not required, which makes the js9 app self-contained
@@ -115,13 +115,14 @@ QUERY='{"id":"'$ID'","cmd":"'$CMD'","args":['$ARGS']'${MULTI}${PAGEID}'}'
 HOST=$HELPER
 echo $HOST | egrep ':[0-9][0-9]*$' 1>/dev/null 2>&1
 if [ $? = 1 ]; then
-  HOST="$HOST:$PORT"
+  HOST="$HOST"
+  #HOST="$HOST:$PORT"
 fi
 
 # encode the query
 URL=$HOST/msg?$( rawurlencode "$QUERY" )
 
-command -v wget 1>/dev/null 2>&1
+command -v waget 1>/dev/null 2>&1
 if [ $? = 0 ]; then
     if [ x"$DODEBUG" != xtrue ]; then
         XARGS="-q"

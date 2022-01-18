@@ -36,7 +36,7 @@ let done = false;
 let doserver = false;
 let dopipe = false;
 let nsendexit = false;
-let verify = false;
+let verify = true;
 let rl = null;
 let socket = null;
 let helperScheme = "http://";
@@ -56,7 +56,8 @@ const defpage = "js9.html";
 const prog = "js9";
 const sockopts = {
     reconnection: false,
-    timeout: 10000
+    timeout: 10000,
+	path: "/js9Helper"
 };
 
 // ever-present
@@ -461,9 +462,9 @@ if( !helperURL ){
 	s += helperScheme;
     }
     s += helperHost;
-    if( !helperHost.match(/:[0-9][0-9]*$/) ){
-	s += `:${helperPort}`;
-    }
+    // if( !helperHost.match(/:[0-9][0-9]*$/) ){
+	// s += `:${helperPort}`;
+    // }
     helperURL = s;
 }
 
