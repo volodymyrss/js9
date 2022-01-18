@@ -175,74 +175,108 @@ const cerr = function(){
 // getTargets: identify target(s) for an external msg for a given ip
 // returns: array of validated targets
 const getTargets = function(socket, msg){
-    let i, j, c, clip, displays;
-    const browserip = msg.browserip || "*";
-    const targets = [];
+	let i, j, c, clip, displays;
+
+	//TODO: always submit to all. its safe in renku
+	const targets = [];
     // ip associated with this socket
-    const myip = getHost(socket);
-    // list of all clients connected on this socket
+    const myip = getHost(socket);    
+	console.log(`myip: ${myip}`);
+
+	// list of all clients connected on this socket
     const clients = getClients();
-    // authentication func
-    const authenticate = (myip, clip) => {
-	// localhost to localhost is always allowed
-	if( ((myip === "127.0.0.1")         ||
-	     (myip === "::ffff:127.0.0.1")  ||
-	     (myip === "::1"))              &&
-	    ((clip === "127.0.0.1")         ||
-	     (clip === "::ffff:127.0.0.1")  ||
-	     (clip === "::1"))              &&
-	    (globalOpts.remoteMsgs >= 0)    ){
-	    return true;
-	}
-	// I can send to myself, if we configured that way
-	if( (myip === clip)                 &&
-	    (globalOpts.remoteMsgs >= 1)    ){
-	    return true;
-	}
-	// allow localhost to send to everyone else
-	if( ((myip === "127.0.0.1")         ||
-	     (myip === "::ffff:127.0.0.1")  ||
-	     (myip === "::1"))              &&
-	    globalOpts.remoteMsgs >= 2      ){
-	    return true;
-	}
-	// security risk: anyone can send to anyone
-	if( globalOpts.remoteMsgs >= 3 ){
-	    return true;
-	}
-	// can't send to anyone
-	return false;
-    };
-    // look at all clients
-    for(i=0; i<clients.length; i++){
-	// current client
-	c = clients[i];
-	// sanity check
-	if( !c.js9 ){
-	    continue;
-	}
-	// client ip
-	clip = getHost(c);
-	if( !authenticate(myip, clip) ){
-	    continue;
-	}
-	// look for matching clients
-	// pageid is a unique id associated with a specific page
-	if( msg.pageid ){
-	    if( msg.pageid === c.js9.pageid ){
-		targets.push(c);
-	    }
-	} else if( ((browserip === "*") || (browserip === clip)) ){
-	    // look for matches in display id
-	    displays = c.js9.displays;
-	    for(j=0; j<displays.length; j++){
-		// look for matching display
-		if( msg.id === displays[j] ){
-		    targets.push(c);
+
+	for(i=0; i<clients.length; i++){
+		// current client
+		c = clients[i];
+		console.log(`msg.pageid: ${msg.pageid} c.js9.pageid: ${c.js9.pageid}`);
+		// sanity check
+		
+		clip = getHost(c);
+		console.log(`clip: ${clip}`);
+
+		if( !c.js9 ){
+			console.log(`this client has no js9: ${clip}`);
+			continue;
 		}
-	    }
+		// client ip
+		
+		displays = c.js9.displays;
+		
+		for(j=0; j<displays.length; j++){
+			console.log(`adding display to targets ${displays[j]} ${c}`);
+			targets.push(c);
+		}
 	}
-    }
+	return targets;
+
+    // const browserip = msg.browserip || "*";
+    // const targets = [];
+    // // ip associated with this socket
+    // const myip = getHost(socket);
+    // // list of all clients connected on this socket
+    // const clients = getClients();
+    // // authentication func
+    // const authenticate = (myip, clip) => {
+	// // localhost to localhost is always allowed
+	// if( ((myip === "127.0.0.1")         ||
+	//      (myip === "::ffff:127.0.0.1")  ||
+	//      (myip === "::1"))              &&
+	//     ((clip === "127.0.0.1")         ||
+	//      (clip === "::ffff:127.0.0.1")  ||
+	//      (clip === "::1"))              &&
+	//     (globalOpts.remoteMsgs >= 0)    ){
+	//     return true;
+	// }
+	// // I can send to myself, if we configured that way
+	// if( (myip === clip)                 &&
+	//     (globalOpts.remoteMsgs >= 1)    ){
+	//     return true;
+	// }
+	// // allow localhost to send to everyone else
+	// if( ((myip === "127.0.0.1")         ||
+	//      (myip === "::ffff:127.0.0.1")  ||
+	//      (myip === "::1"))              &&
+	//     globalOpts.remoteMsgs >= 2      ){
+	//     return true;
+	// }
+	// // security risk: anyone can send to anyone
+	// if( globalOpts.remoteMsgs >= 3 ){
+	//     return true;
+	// }
+	// // can't send to anyone
+	// return false;
+    // };
+    // // look at all clients
+    // for(i=0; i<clients.length; i++){
+	// // current client
+	// c = clients[i];
+	// // sanity check
+	// if( !c.js9 ){
+	//     continue;
+	// }
+	// // client ip
+	// clip = getHost(c);
+	// if( !authenticate(myip, clip) ){
+	//     continue;
+	// }
+	// // look for matching clients
+	// // pageid is a unique id associated with a specific page
+	// if( msg.pageid ){
+	//     if( msg.pageid === c.js9.pageid ){
+	// 		targets.push(c);
+	//     }
+	// } else if( ((browserip === "*") || (browserip === clip)) ){
+	//     // look for matches in display id
+	//     displays = c.js9.displays;
+	//     for(j=0; j<displays.length; j++){
+	// 	// look for matching display
+	// 	if( msg.id === displays[j] ){
+	// 	    targets.push(c);
+	// 	}
+	//     }
+	// }
+    // }
     return targets;
 };
 
@@ -882,7 +916,8 @@ const pageReady = function(socket, obj, cbfunc, tries){
 	// look for targets
 	targets = getTargets(socket, obj);
 	// if we have at least one ...
-	if( (targets.length === 1) || (targets.length > 1 && obj.multi) ){
+	// if( (targets.length === 1) || (targets.length > 1 && obj.multi) ){
+	if( (targets.length > 0) ){
 	    // send command to JS9 instance(s)
 	    for(i=0; i<targets.length; i++){
 		targets[i].emit("msg", obj, myfunc);
@@ -902,7 +937,7 @@ const pageReady = function(socket, obj, cbfunc, tries){
 	    } else {
 		// it's an error
 		if( cbfunc ){
-		    cbfunc(`ERROR: ${targets.length} JS9 instance(s) found with id ${obj.id} (${obj.cmd})`);
+		    cbfunc(`ERROR in pageReady: ${targets.length} JS9 instance(s) found with id ${obj.id} (${obj.cmd})`);
 		}
 	    }
 	}
@@ -952,6 +987,7 @@ const sendMsg = function(socket, obj, cbfunc) {
 	return;
     }
     // look for one target (or else that multi is allowed)
+	obj.multi = true;
     if( (targets.length === 1) || (targets.length > 1 && obj.multi) ){
 	// send command to JS9 instance(s)
 	for(i=0; i<targets.length; i++){
@@ -965,7 +1001,7 @@ const sendMsg = function(socket, obj, cbfunc) {
 	}
 	// it's an error
 	if( cbfunc ){
-            cbfunc(`ERROR: ${targets.length} JS9 instance(s) found with id ${obj.id} (${obj.cmd})`);
+            cbfunc(`ERROR in sendMsg: ${targets.length} JS9 instance(s) found with id ${obj.id} (${obj.cmd})`);
 	}
     }
 };
