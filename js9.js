@@ -11490,21 +11490,36 @@ JS9.Helper.prototype.connect = function(type){
 
     const connectHelper = (url) => {
 
-		let parsed_url;
-		parsed_url = new URL(url);
+		let parsed_url, socketio_path;
+		JS9.log(`document URL ${document.URL}`)
+		JS9.log(`passed url ${url}`)
+		
+		// parsed_url = new URL(url);
+		// socketio_path = parsed_url.pathname.replace('socket.io.js', 'socket.io') // for passed url
+		
+		parsed_url = new URL(document.URL);
+		socketio_path = parsed_url.pathname.replace("/js9html/", "/js9Helper/socket.io")
+		
 		JS9.log('parsed url');
 		JS9.log(parsed_url);
+		
+		JS9.log(`deduced socketio_path ${socketio_path}`)
 
 		// connect to helper
+
+	let socketio_js_url;
+	socketio_js_url = document.URL + '/socket.io.js';
+	// socketio_js_url = parsed_url.pathname.replace('js9Helper/socket.io.js', 'js9html/socket.io.js');
+
 	JS9.log(`JS9 JS9.Helper.prototype.connect will ajax url: ${url}`);				
 	$.ajax({		
 	    // url: url,
 		// url: "http://localhost:8888/js9html/socket.io.js", // TODO: script source
-		url: parsed_url.pathname.replace('js9Helper/socket.io.js', 'js9html/socket.io.js'),
+		url: socketio_js_url,
 	    dataType: "script",
 	    timeout: JS9.globalOpts.htimeout,
 	    cache: true,
-	    success: () => {
+	    success: () => {		
 
 		JS9.log(`JS9 connectHelper sockurl url: ${url}`);			
 		const sockopts = {
@@ -11514,7 +11529,8 @@ JS9.Helper.prototype.connect = function(type){
 		    reconnectionAttempts: 100,
 		    timeout: JS9.globalOpts.htimeout,
 			// path: "/js9Helper/socket.io",
-			path: parsed_url.pathname.replace('socket.io.js', 'socket.io')
+			// path: parsed_url.pathname.replace('socket.io.js', 'socket.io') // fpr passed url
+			path: socketio_path
 			// transports: ['polling'], 
 		};
 		// if there is no io object, we didn't really succeed
