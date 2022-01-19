@@ -11509,6 +11509,8 @@ JS9.Helper.prototype.connect = function(type){
 
 	let socketio_js_url;
 	socketio_js_url = document.URL + '/socket.io.js';
+
+	// socketio_js_url = "http://0.0.0.0:8000/socket.io.js"
 	// socketio_js_url = parsed_url.pathname.replace('js9Helper/socket.io.js', 'js9html/socket.io.js');
 
 	JS9.log(`JS9 JS9.Helper.prototype.connect will ajax url: ${url}`);				
@@ -11530,7 +11532,11 @@ JS9.Helper.prototype.connect = function(type){
 		    timeout: JS9.globalOpts.htimeout,
 			// path: "/js9Helper/socket.io",
 			// path: parsed_url.pathname.replace('socket.io.js', 'socket.io') // fpr passed url
-			path: socketio_path
+
+			// TODO: enable for remote!
+			path: socketio_path 
+			// path: '/js9Helper/socket.io'
+
 			// transports: ['polling'], 
 		};
 		// if there is no io object, we didn't really succeed
@@ -11540,15 +11546,15 @@ JS9.Helper.prototype.connect = function(type){
 		    return;
 		}
 		// connect to the helper
-		// VS:
-		// url = "http://127.0.0.1:8888"
-		// url = "http://localhost:8000";
+		
 
 		JS9.log(`JS9 helper: auto-url: ${url}`);
 		// url = "http://localhost:8888";
 		url = parsed_url.host;
 		JS9.log(`JS9 helper: adapted-url: ${url}`);
-		
+
+		// local enforce
+		// url = "http://localhost:8000";
 
 		JS9.log(`JS9 helper: connecting socket: ${url} ${sockopts}`);
 		this.socket = io(url, sockopts);

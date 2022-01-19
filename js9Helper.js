@@ -189,16 +189,18 @@ const getTargets = function(socket, msg){
 	for(i=0; i<clients.length; i++){
 		// current client
 		c = clients[i];
+
+		if( !c.js9 ){
+			console.log(`this client has no js9: ${clip}`);
+			continue;
+		}
+
 		console.log(`msg.pageid: ${msg.pageid} c.js9.pageid: ${c.js9.pageid}`);
 		// sanity check
 		
 		clip = getHost(c);
 		console.log(`clip: ${clip}`);
 
-		if( !c.js9 ){
-			console.log(`this client has no js9: ${clip}`);
-			continue;
-		}
 		// client ip
 		
 		displays = c.js9.displays;
